@@ -4,14 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Navigation } from "@/components/Navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Save, Plus, Trash2 } from "lucide-react";
+import { useUserData, SubjectData } from "@/hooks/useUserData";
+import { useNavigate } from "react-router-dom";
 
 const DataEntry = () => {
-  const [subjects, setSubjects] = useState([
-    { name: "Data Structures", score: "", attendance: "" },
-    { name: "Computer Networks", score: "", attendance: "" },
+  const { userData, saveUserData } = useUserData();
+  const navigate = useNavigate();
+  
+  const [subjects, setSubjects] = useState<SubjectData[]>([
+    { name: "", score: 0, attendance: 0 }
   ]);
   
   const [studyData, setStudyData] = useState({
@@ -20,32 +24,77 @@ const DataEntry = () => {
     screenTime: ""
   });
 
+  const [profileData, setProfileData] = useState({
+    name: "",
+    branch: "",
+    year: ""
+  });
+
+  // Load existing data on component mount
+  useEffect(() => {
+    if (userData.subjects.length > 0) {
+      setSubjects(userData.subjects);
+    }
+    setStudyData({
+      dailyStudyHours: userData.studyData.dailyStudyHours?.toString() || "",
+      sleepHours: userData.studyData.sleepHours?.toString() || "",
+      screenTime: userData.studyData.screenTime?.toString() || ""
+    });
+    setProfileData({
+      name: userData.name,
+      branch: userData.branch,
+      year: userData.year
+    });
+  }, [userData]);
+
   const addSubject = () => {
-    setSubjects([...subjects, { name: "", score: "", attendance: "" }]);
+    setSubjects([...subjects, { name: "", score: 0, attendance: 0 }]);
   };
 
   const removeSubject = (index: number) => {
     setSubjects(subjects.filter((_, i) => i !== index));
   };
 
-  const updateSubject = (index: number, field: string, value: string) => {
+  const updateSubject = (index: number, field: keyof SubjectData, value: string | number) => {
     const updated = subjects.map((subject, i) => 
-      i === index ? { ...subject, [field]: value } : subject
+      i === index ? { ...subject, [field]: field === 'name' ? value : Number(value) } : subject
     );
     setSubjects(updated);
   };
 
   const handleSave = () => {
     // Validation
-    const hasValidData = subjects.some(s => s.name && s.score && s.attendance);
-    if (!hasValidData) {
-      toast.error("Please fill in at least one complete subject entry");
+    const validSubjects = subjects.filter(s => s.name.trim() && s.score >= 0 && s.attendance >= 0);
+    
+    if (validSubjects.length === 0) {
+      toast.error("Please add at least one subject with valid data");
       return;
     }
 
-    // Here you would typically save to localStorage or API
-    console.log("Saving data:", { subjects, studyData });
+    if (!profileData.name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+
+    // Save to localStorage via the hook
+    saveUserData({
+      name: profileData.name,
+      branch: profileData.branch,
+      year: profileData.year,
+      subjects: validSubjects,
+      studyData: {
+        dailyStudyHours: Number(studyData.dailyStudyHours) || 0,
+        sleepHours: Number(studyData.sleepHours) || 0,
+        screenTime: Number(studyData.screenTime) || 0
+      }
+    });
+
     toast.success("Data saved successfully! 🎉");
+    
+    // Navigate to dashboard after a short delay
+    setTimeout(() => {
+      navigate('/dashboard');
+    }, 1500);
   };
 
   return (
@@ -62,6 +111,44 @@ const DataEntry = () => {
               Enter your latest scores, attendance, and study habits to get personalized insights
             </p>
           </div>
+
+          {/* Profile Information */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Profile Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="name">Your Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g. Alex Kumar"
+                    value={profileData.name}
+                    onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="branch">Branch</Label>
+                  <Input
+                    id="branch"
+                    placeholder="e.g. Computer Science"
+                    value={profileData.branch}
+                    onChange={(e) => setProfileData({...profileData, branch: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="year">Year</Label>
+                  <Input
+                    id="year"
+                    placeholder="e.g. 3rd Year"
+                    value={profileData.year}
+                    onChange={(e) => setProfileData({...profileData, year: e.target.value})}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Subjects Section */}
@@ -115,7 +202,7 @@ const DataEntry = () => {
                               min="0"
                               max="100"
                               placeholder="85"
-                              value={subject.score}
+                              value={subject.score || ''}
                               onChange={(e) => updateSubject(index, 'score', e.target.value)}
                             />
                           </div>
@@ -128,7 +215,7 @@ const DataEntry = () => {
                               min="0"
                               max="100"
                               placeholder="90"
-                              value={subject.attendance}
+                              value={subject.attendance || ''}
                               onChange={(e) => updateSubject(index, 'attendance', e.target.value)}
                             />
                           </div>
@@ -212,22 +299,6 @@ const DataEntry = () => {
               Save & Analyze Data
             </Button>
           </div>
-
-          {/* Import Option */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Import from CSV (Optional)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
-                <div className="text-4xl mb-2">📄</div>
-                <p className="text-gray-600 dark:text-gray-300 mb-4">
-                  Have data in a spreadsheet? Upload your CSV file here
-                </p>
-                <Button variant="outline">Choose CSV File</Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

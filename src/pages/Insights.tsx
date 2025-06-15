@@ -4,45 +4,138 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Brain, TrendingUp, AlertTriangle, CheckCircle, Target, Clock } from "lucide-react";
+import { useUserData } from "@/hooks/useUserData";
+import { Link } from "react-router-dom";
 
 const Insights = () => {
-  const insights = [
-    {
-      type: "success",
-      icon: CheckCircle,
-      title: "Strong Performance in Mathematics",
-      description: "You've maintained consistent scores above 85% in Mathematics. Keep up the excellent work!",
-      action: "Continue current study pattern"
-    },
-    {
-      type: "warning",
-      icon: AlertTriangle,
-      title: "Chemistry Needs Attention",
-      description: "Your Chemistry marks have dropped by 12% over the last month. Focus on organic chemistry concepts.",
-      action: "Schedule extra study sessions"
-    },
-    {
-      type: "info",
-      icon: Clock,
-      title: "Peak Performance Hours",
-      description: "Your highest scores occur when studying between 8-10 PM. Consider scheduling difficult subjects during this time.",
-      action: "Optimize study schedule"
-    },
-    {
-      type: "success",
-      icon: TrendingUp,
-      title: "Improved Sleep Pattern",
-      description: "Getting 7+ hours of sleep has improved your average scores by 8%. Maintain this healthy habit!",
-      action: "Keep consistent sleep schedule"
-    },
-    {
-      type: "warning",
-      icon: Target,
-      title: "Attendance Alert",
-      description: "Your attendance in Physics (72%) is below the required 75%. This may affect your internal marks.",
-      action: "Prioritize attendance"
+  const { userData, metrics } = useUserData();
+  const hasData = userData.subjects.length > 0;
+
+  // Generate dynamic insights based on user data
+  const generateInsights = () => {
+    if (!hasData) return [];
+
+    const insights = [];
+    const avgScore = metrics.averageScore;
+    const avgAttendance = metrics.averageAttendance;
+    const studyHours = userData.studyData.dailyStudyHours;
+    const sleepHours = userData.studyData.sleepHours;
+    const screenTime = userData.studyData.screenTime;
+
+    // Performance insights
+    if (avgScore >= 85) {
+      insights.push({
+        type: "success",
+        icon: CheckCircle,
+        title: "Excellent Academic Performance",
+        description: `Your average score of ${avgScore}% is outstanding! You're maintaining excellent performance across subjects.`,
+        action: "Keep up the great work"
+      });
+    } else if (avgScore >= 70) {
+      insights.push({
+        type: "info",
+        icon: TrendingUp,
+        title: "Good Performance with Room to Grow",
+        description: `Your average score of ${avgScore}% is good. Focus on your weaker subjects to reach excellence.`,
+        action: "Target improvement areas"
+      });
+    } else {
+      insights.push({
+        type: "warning",
+        icon: AlertTriangle,
+        title: "Performance Needs Attention",
+        description: `Your average score of ${avgScore}% indicates room for improvement. Consider revising study strategies.`,
+        action: "Schedule focused study sessions"
+      });
     }
-  ];
+
+    // Find lowest performing subject
+    const lowestSubject = userData.subjects.reduce((lowest, current) => 
+      current.score < lowest.score ? current : lowest
+    );
+    
+    if (lowestSubject.score < avgScore - 10) {
+      insights.push({
+        type: "warning",
+        icon: AlertTriangle,
+        title: `${lowestSubject.name} Needs Extra Attention`,
+        description: `Your ${lowestSubject.name} score (${lowestSubject.score}%) is significantly below your average. Focus on this subject.`,
+        action: "Schedule extra study time"
+      });
+    }
+
+    // Attendance insights
+    if (avgAttendance < 75) {
+      insights.push({
+        type: "warning",
+        icon: Target,
+        title: "Attendance Alert",
+        description: `Your average attendance (${avgAttendance}%) is below the required 75%. This may affect your internal marks.`,
+        action: "Prioritize attendance"
+      });
+    } else if (avgAttendance >= 90) {
+      insights.push({
+        type: "success",
+        icon: CheckCircle,
+        title: "Excellent Attendance",
+        description: `Your ${avgAttendance}% attendance shows great discipline. This consistency will help your academic success.`,
+        action: "Maintain this pattern"
+      });
+    }
+
+    // Study habits insights
+    if (studyHours && studyHours >= 6) {
+      insights.push({
+        type: "success",
+        icon: Clock,
+        title: "Strong Study Routine",
+        description: `Studying ${studyHours} hours daily shows dedication. This consistent effort is key to your success.`,
+        action: "Continue this routine"
+      });
+    } else if (studyHours && studyHours < 4) {
+      insights.push({
+        type: "warning",
+        icon: Clock,
+        title: "Increase Study Time",
+        description: `${studyHours} hours of daily study might not be sufficient. Consider increasing focused study time.`,
+        action: "Aim for 5-6 hours daily"
+      });
+    }
+
+    // Sleep insights
+    if (sleepHours && sleepHours >= 7) {
+      insights.push({
+        type: "success",
+        icon: CheckCircle,
+        title: "Healthy Sleep Pattern",
+        description: `Getting ${sleepHours} hours of sleep supports your academic performance. Great job maintaining this!`,
+        action: "Keep this sleep schedule"
+      });
+    } else if (sleepHours && sleepHours < 6) {
+      insights.push({
+        type: "warning",
+        icon: AlertTriangle,
+        title: "Sleep More for Better Performance",
+        description: `Only ${sleepHours} hours of sleep may be affecting your performance. Aim for 7-8 hours nightly.`,
+        action: "Improve sleep schedule"
+      });
+    }
+
+    // Screen time insights
+    if (screenTime && studyHours && screenTime > studyHours) {
+      insights.push({
+        type: "warning",
+        icon: AlertTriangle,
+        title: "Screen Time Exceeding Study Time",
+        description: `${screenTime} hours of screen time vs ${studyHours} hours of study. This imbalance may hurt your focus.`,
+        action: "Reduce screen distractions"
+      });
+    }
+
+    return insights;
+  };
+
+  const insights = generateInsights();
 
   const studyTips = [
     "Break study sessions into 25-minute focused blocks (Pomodoro Technique)",
@@ -86,32 +179,53 @@ const Insights = () => {
           </CardContent>
         </Card>
 
-        {/* Insights Grid */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {insights.map((insight, index) => (
-            <Card key={index} className={`border-l-4 ${getInsightColor(insight.type)}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  <insight.icon className="h-5 w-5 mt-1" />
-                  <div className="flex-1">
-                    <CardTitle className="text-lg mb-1">{insight.title}</CardTitle>
-                    <Badge variant={insight.type === "success" ? "default" : insight.type === "warning" ? "destructive" : "secondary"}>
-                      {insight.type.toUpperCase()}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-gray-600 dark:text-gray-300 mb-4">
-                  {insight.description}
-                </p>
-                <Button variant="outline" size="sm">
-                  {insight.action}
+        {!hasData ? (
+          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-900/20">
+            <CardContent className="p-12 text-center">
+              <Brain className="h-16 w-16 text-orange-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-orange-800 dark:text-orange-200 mb-2">
+                No Data for Insights
+              </h3>
+              <p className="text-orange-700 dark:text-orange-300 mb-6">
+                Add your academic data to receive personalized insights and recommendations for improvement.
+              </p>
+              <Link to="/data-entry">
+                <Button className="bg-orange-600 hover:bg-orange-700">
+                  Add Your Data to Get Insights
                 </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Insights Grid */}
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              {insights.map((insight, index) => (
+                <Card key={index} className={`border-l-4 ${getInsightColor(insight.type)}`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start gap-3">
+                      <insight.icon className="h-5 w-5 mt-1" />
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-1">{insight.title}</CardTitle>
+                        <Badge variant={insight.type === "success" ? "default" : insight.type === "warning" ? "destructive" : "secondary"}>
+                          {insight.type.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-gray-600 dark:text-gray-300 mb-4">
+                      {insight.description}
+                    </p>
+                    <Button variant="outline" size="sm">
+                      {insight.action}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Study Tips */}
         <Card>
