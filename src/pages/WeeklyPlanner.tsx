@@ -47,26 +47,36 @@ const WeeklyPlanner = () => {
 
   // Initialize audio
   useEffect(() => {
-    // Create a simple beep sound using Web Audio API
-    const createBeepSound = () => {
+    // Create a function to play beep sound multiple times
+    const playBeepSequence = () => {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
       
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 1);
+      const playBeep = (delay: number) => {
+        setTimeout(() => {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 800;
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+        }, delay);
+      };
+
+      // Play 5 beeps with 600ms intervals
+      for (let i = 0; i < 5; i++) {
+        playBeep(i * 600);
+      }
     };
 
-    audioRef.current = { play: createBeepSound } as any;
+    audioRef.current = { play: playBeepSequence } as any;
   }, []);
 
   // Pomodoro timer effect
