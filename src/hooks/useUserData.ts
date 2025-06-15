@@ -112,6 +112,22 @@ export interface UserData {
   lastUpdated: string;
 }
 
+// Add Challenge types
+export interface Challenge {
+  id: string;
+  name: string;
+  description: string;
+  type: "daily" | "weekly";
+  target: number;
+  progress: number;
+  active: boolean;
+  startedAt: string; // ISO date
+  completed: boolean;
+  completedAt?: string;
+}
+
+const defaultChallenge: Challenge | null = null;
+
 const defaultUserData: UserData = {
   name: "Student",
   branch: "Computer Science",
@@ -149,6 +165,11 @@ const defaultUserData: UserData = {
 
 export const useUserData = () => {
   const [userData, setUserData] = useState<UserData>(defaultUserData);
+  // Challenge mode: keep outside userData for flexibility, but persist to localStorage
+  const [challenge, setChallenge] = useState<Challenge | null>(() => {
+    const stored = localStorage.getItem('trackMyStudyChallenge');
+    return stored ? JSON.parse(stored) : defaultChallenge;
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem('trackMyStudyData');
@@ -175,6 +196,102 @@ export const useUserData = () => {
       }
     }
   }, []);
+
+  // Save challenge to localStorage
+  const saveChallenge = (updated: Challenge | null) => {
+    if (updated) {
+      setChallenge(updated);
+      localStorage.setItem('trackMyStudyChallenge', JSON.stringify(updated));
+    } else {
+      setChallenge(null);
+      localStorage.removeItem('trackMyStudyChallenge');
+    }
+  };
+
+  // Start a new challenge (overwrites current)
+  const startChallenge = (challengeType: "daily" | "weekly") => {
+    let newChallenge: Challenge;
+    if (challengeType === "daily") {
+      newChallenge = {
+        id: `challenge-daily-${Date.now()}`,
+        name: "Study 5 Days in a Row",
+        description: "Study for at least 30 minutes 5 days in a row.",
+        type: "daily",
+        target: 5,
+        progress: 0,
+        active: true,
+        startedAt: new Date().toISOString(),
+        completed: false,
+      };
+    } else {
+      newChallenge = {
+        id: `challenge-weekly-${Date.now()}`,
+        name: "Complete 7 Sessions This Week",
+        description: "Finish 7 study sessions in the current week.",
+        type: "weekly",
+        target: 7,
+        progress: 0,
+        active: true,
+        startedAt: new Date().toISOString(),
+        completed: false,
+      };
+    }
+    saveChallenge(newChallenge);
+  };
+
+  // Reset the current challenge
+  const resetChallenge = () => {
+    saveChallenge(null);
+  };
+
+  // Progress challenge automatically based on study data
+  useEffect(() => {
+    if (!challenge || !challenge.active || challenge.completed) return;
+
+    let progress = challenge.progress;
+    if (challenge.type === "daily") {
+      // Count #days in a row with >=30min in last N days (target=N)
+      const streakDays = [];
+      let count = 0;
+      let date = new Date();
+      for (let i = 0; i < challenge.target; i++) {
+        const dateStr = date.toISOString().split('T')[0];
+        const stat = userData.dailyStats.find(s => s.date === dateStr && s.totalMinutes >= 30);
+        if (stat) {
+          count += 1;
+          streakDays.push(dateStr);
+        } else {
+          break;
+        }
+        date.setDate(date.getDate() - 1);
+      }
+      progress = count;
+    } else if (challenge.type === "weekly") {
+      // Sessions completed in current calendar week
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
+      const count = userData.studySessions.filter(s =>
+        s.completed &&
+        new Date(s.date) >= weekStart &&
+        new Date(s.date) < weekEnd
+      ).length;
+      progress = count;
+    }
+
+    if (progress !== challenge.progress) {
+      const updated = { ...challenge, progress };
+      // Complete if target met
+      if (progress >= challenge.target && !challenge.completed) {
+        updated.completed = true;
+        updated.completedAt = new Date().toISOString();
+        updated.active = false;
+      }
+      saveChallenge(updated);
+    }
+    // eslint-disable-next-line
+  }, [userData.dailyStats, userData.studySessions]);
 
   const saveUserData = (newData: Partial<UserData>) => {
     const updatedData = {
@@ -620,6 +737,11 @@ export const useUserData = () => {
     getStressTrend,
     getAverageStressLevel,
     getWeeklySleepHours,
-    metrics: calculateMetrics()
+    metrics: calculateMetrics(),
+    // Challenge mode exports:
+    challenge,
+    startChallenge,
+    resetChallenge,
+    saveChallenge,
   };
 };

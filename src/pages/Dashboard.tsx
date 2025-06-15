@@ -1,291 +1,159 @@
-import { Button } from "@/components/ui/button";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "react-router-dom";
-import { Plus, BookOpen, Clock, TrendingUp, Users, AlertCircle, Timer } from "lucide-react";
-import { Navigation } from "@/components/Navigation";
-import { AttendanceTracker } from "@/components/AttendanceTracker";
-import { GoalAnalytics } from "@/components/GoalAnalytics";
-import { StudyStreakTracker } from "@/components/StudyStreakTracker";
-import { StressMonitor } from "@/components/StressMonitor";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserData } from "@/hooks/useUserData";
 import { BurnoutAlert } from "@/components/BurnoutAlert";
 import { AchievementBadges } from "@/components/AchievementBadges";
-
+import { StudyStreakTracker } from "@/components/StudyStreakTracker";
+import ChallengeMode from "@/components/ChallengeMode";
+ 
 const Dashboard = () => {
-  const { userData, metrics, getWeeklyActualHours, getStudyCompletionRate, checkStreakMaintenance } = useUserData();
+  const { userData } = useUserData();
   
-  // Check if streak needs to be maintained
-  checkStreakMaintenance();
-  
-  const hasData = userData.subjects.length > 0;
-  const timeSinceLastUpdate = userData.lastUpdated 
-    ? Math.floor((Date.now() - new Date(userData.lastUpdated).getTime()) / (1000 * 60 * 60 * 24))
-    : 0;
-
-  const weeklyActualHours = getWeeklyActualHours();
-  const studyCompletionRate = getStudyCompletionRate();
-  const totalCompletedSessions = userData.studySessions.filter(session => session.completed).length;
-
-  // Calculate today's study time
-  const today = new Date().toISOString().split('T')[0];
-  const todaysSessions = userData.studySessions.filter(session => 
-    session.date === today && session.completed
-  );
-  const todaysStudyMinutes = todaysSessions.reduce((sum, session) => sum + session.duration, 0);
-  const todaysStudyHours = todaysStudyMinutes / 60;
-
-  const showFocusAlert = userData.studyData.screenTime > todaysStudyHours && userData.studyData.screenTime > 0;
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
+    <div className="mx-auto max-w-3xl p-4">
+      {/* Challenge Mode */}
+      <ChallengeMode />
       
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome back, {userData.name}! 👋
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              {userData.branch} • {userData.year} • Last updated {timeSinceLastUpdate === 0 ? 'today' : `${timeSinceLastUpdate} days ago`}
-            </p>
-          </div>
-          <Link to="/data-entry">
-            <Button className="bg-indigo-600 hover:bg-indigo-700 mt-4 sm:mt-0">
-              <Plus className="h-4 w-4 mr-2" />
-              {hasData ? 'Update Data' : 'Add Data'}
-            </Button>
-          </Link>
-        </div>
-
-        <BurnoutAlert />
-        <AchievementBadges />
-
-        {/* No Data State */}
-        {!hasData && (
-          <Card className="mb-8 border-orange-200 bg-orange-50 dark:bg-orange-900/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <AlertCircle className="h-6 w-6 text-orange-600" />
-                <h3 className="text-lg font-semibold text-orange-800 dark:text-orange-200">
-                  No Data Available
-                </h3>
-              </div>
-              <p className="text-orange-700 dark:text-orange-300 mb-4">
-                Start tracking your academic performance by adding your subject scores, attendance, and study habits.
-              </p>
-              <Link to="/data-entry">
-                <Button className="bg-orange-600 hover:bg-orange-700">
-                  Get Started - Add Your First Data
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Focus vs Distraction Alert - Updated with real data */}
-        {showFocusAlert && (
-          <Card className="mb-8 border-red-200 bg-red-50 dark:bg-red-900/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-6 w-6 text-red-600" />
-                <div>
-                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">
-                    Focus Alert! 📱
-                  </h3>
-                  <p className="text-red-700 dark:text-red-300">
-                    Your screen time ({userData.studyData.screenTime}h) is higher than today's actual study time ({todaysStudyHours.toFixed(1)}h). Time to refocus!
-                  </p>
+      <BurnoutAlert />
+      
+      <AchievementBadges />
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <StudyStreakTracker />
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Weekly Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm font-medium">Study Sessions</div>
+                <div className="text-2xl font-bold">
+                  {userData.studySessions.filter(s => s.completed).length}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Overview Cards - Updated with real study data */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium opacity-90">Average Score</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <BookOpen className="h-8 w-8 mr-3" />
-                <div>
-                  <div className="text-3xl font-bold">
-                    {hasData ? `${metrics.averageScore}%` : '--'}
-                  </div>
-                  <div className="text-sm opacity-90">
-                    {metrics.totalSubjects} {metrics.totalSubjects === 1 ? 'subject' : 'subjects'}
-                  </div>
+              
+              <div>
+                <div className="text-sm font-medium">Subjects Tracked</div>
+                <div className="text-2xl font-bold">
+                  {userData.subjects.length}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium opacity-90">Attendance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <Users className="h-8 w-8 mr-3" />
-                <div>
-                  <div className="text-3xl font-bold">
-                    {hasData ? `${metrics.averageAttendance}%` : '--'}
-                  </div>
-                  <div className="text-sm opacity-90">average</div>
+              
+              <div>
+                <div className="text-sm font-medium">Goals Completed</div>
+                <div className="text-2xl font-bold">
+                  {userData.dailyGoals.filter(g => g.completed).length}/{userData.dailyGoals.length}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium opacity-90">Weekly Study Hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <Clock className="h-8 w-8 mr-3" />
-                <div>
-                  <div className="text-3xl font-bold">
-                    {weeklyActualHours.toFixed(1)}
-                  </div>
-                  <div className="text-sm opacity-90">actual hours</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium opacity-90">Session Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <Timer className="h-8 w-8 mr-3" />
-                <div>
-                  <div className="text-3xl font-bold">
-                    {studyCompletionRate}%
-                  </div>
-                  <div className="text-sm opacity-90">completion rate</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* New Real-Time Tracking Section */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <AttendanceTracker />
-          <GoalAnalytics />
-        </div>
-
-        {/* New Features Section - Study Streak and Stress Monitor */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <StudyStreakTracker />
-          <StressMonitor />
-        </div>
-
-        {/* Real Study Performance */}
-        <div className="grid lg:grid-cols-2 gap-6">
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Tabs defaultValue="goals">
+        <TabsList className="grid grid-cols-3 mb-4">
+          <TabsTrigger value="goals">Daily Goals</TabsTrigger>
+          <TabsTrigger value="schedule">Schedule</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="goals">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Study Sessions</CardTitle>
+              <CardTitle>Today's Goals</CardTitle>
             </CardHeader>
             <CardContent>
-              {totalCompletedSessions > 0 ? (
-                <div className="space-y-4">
-                  {userData.studySessions
-                    .filter(session => session.completed)
-                    .slice(-5)
-                    .reverse()
-                    .map((session, index) => (
-                    <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {session.subject || 'General Study'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                          {session.duration} min • {new Date(session.date).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div className="text-2xl text-green-500">
-                        ✅
-                      </div>
-                    </div>
-                  ))}
+              {userData.dailyGoals.length === 0 ? (
+                <div className="text-center py-6 text-gray-500">
+                  No goals set for today. Add some goals to track your progress!
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <Timer className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No study sessions yet</p>
-                  <p className="text-sm">Use the timer in Weekly Planner to track sessions</p>
+                <div className="space-y-4">
+                  {userData.dailyGoals.map(goal => (
+                    <div key={goal.id} className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        checked={goal.completed} 
+                        className="h-5 w-5" 
+                      />
+                      <span className={goal.completed ? "line-through text-gray-500" : ""}>
+                        {goal.text}
+                      </span>
+                      <span className="ml-auto text-xs">
+                        {goal.priority === "high" ? "🔴" : goal.priority === "medium" ? "🟠" : "🟢"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
           </Card>
-
+        </TabsContent>
+        
+        <TabsContent value="schedule">
           <Card>
             <CardHeader>
-              <CardTitle>Study Statistics</CardTitle>
+              <CardTitle>Weekly Schedule</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <span className="font-medium">Total Completed Sessions</span>
-                  <span className="text-xl font-bold text-blue-600">{totalCompletedSessions}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <span className="font-medium">This Week's Hours</span>
-                  <span className="text-xl font-bold text-green-600">{weeklyActualHours.toFixed(1)}h</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <span className="font-medium">Today's Study Time</span>
-                  <span className="text-xl font-bold text-purple-600">{todaysStudyHours.toFixed(1)}h</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                  <span className="font-medium">Completion Rate</span>
-                  <span className="text-xl font-bold text-orange-600">{studyCompletionRate}%</span>
-                </div>
+                {Object.entries(userData.weeklySchedule).map(([day, data]) => (
+                  <div key={day} className="flex items-center">
+                    <div className="w-24 font-medium capitalize">{day}</div>
+                    <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500" 
+                        style={{ width: `${(data.completed / Math.max(data.planned, 1)) * 100}%` }}
+                      ></div>
+                    </div>
+                    <div className="w-20 text-right text-sm">
+                      {data.completed}/{data.planned}h
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="mt-6">
+        </TabsContent>
+        
+        <TabsContent value="performance">
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle>Subject Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3">
-                <Link to="/analysis">
-                  <Button variant="outline" className="w-full justify-start" disabled={!hasData}>
-                    📊 View Performance Analysis
-                  </Button>
-                </Link>
-                <Link to="/insights">
-                  <Button variant="outline" className="w-full justify-start" disabled={!hasData}>
-                    🧠 Get Smart Insights
-                  </Button>
-                </Link>
-                <Link to="/peer-comparison">
-                  <Button variant="outline" className="w-full justify-start" disabled={!hasData}>
-                    👥 Compare with Peers
-                  </Button>
-                </Link>
-                <Link to="/weekly-planner">
-                  <Button variant="outline" className="w-full justify-start">
-                    📅 Plan This Week
-                  </Button>
-                </Link>
-              </div>
+              {userData.subjects.length === 0 ? (
+                <div className="text-center py-6 text-gray-500">
+                  No subjects added yet. Add subjects to track your performance!
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userData.subjects.map(subject => (
+                    <div key={subject.name} className="space-y-1">
+                      <div className="flex justify-between">
+                        <div className="font-medium">{subject.name}</div>
+                        <div>{subject.score}/10</div>
+                      </div>
+                      <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-green-500" 
+                          style={{ width: `${(subject.score / 10) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Attendance: {subject.attendance}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
