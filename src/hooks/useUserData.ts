@@ -13,12 +13,30 @@ export interface StudyData {
   screenTime: number;
 }
 
+export interface DailyGoal {
+  id: string;
+  text: string;
+  completed: boolean;
+  date: string; // YYYY-MM-DD format
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface WeeklySchedule {
+  [key: string]: { // day of week (monday, tuesday, etc)
+    planned: number;
+    completed: number;
+    subjects: string[];
+  };
+}
+
 export interface UserData {
   name: string;
   branch: string;
   year: string;
   subjects: SubjectData[];
   studyData: StudyData;
+  dailyGoals: DailyGoal[];
+  weeklySchedule: WeeklySchedule;
   lastUpdated: string;
 }
 
@@ -32,6 +50,16 @@ const defaultUserData: UserData = {
     sleepHours: 0,
     screenTime: 0
   },
+  dailyGoals: [],
+  weeklySchedule: {
+    monday: { planned: 0, completed: 0, subjects: [] },
+    tuesday: { planned: 0, completed: 0, subjects: [] },
+    wednesday: { planned: 0, completed: 0, subjects: [] },
+    thursday: { planned: 0, completed: 0, subjects: [] },
+    friday: { planned: 0, completed: 0, subjects: [] },
+    saturday: { planned: 0, completed: 0, subjects: [] },
+    sunday: { planned: 0, completed: 0, subjects: [] }
+  },
   lastUpdated: new Date().toISOString()
 };
 
@@ -43,7 +71,14 @@ export const useUserData = () => {
     if (stored) {
       try {
         const parsedData = JSON.parse(stored);
-        setUserData(parsedData);
+        // Ensure all required fields exist
+        const mergedData = {
+          ...defaultUserData,
+          ...parsedData,
+          dailyGoals: parsedData.dailyGoals || [],
+          weeklySchedule: parsedData.weeklySchedule || defaultUserData.weeklySchedule
+        };
+        setUserData(mergedData);
       } catch (error) {
         console.error('Error parsing stored data:', error);
       }
@@ -58,6 +93,49 @@ export const useUserData = () => {
     };
     setUserData(updatedData);
     localStorage.setItem('trackMyStudyData', JSON.stringify(updatedData));
+  };
+
+  const addDailyGoal = (text: string, priority: 'low' | 'medium' | 'high' = 'medium') => {
+    const newGoal: DailyGoal = {
+      id: Date.now().toString(),
+      text,
+      completed: false,
+      date: new Date().toISOString().split('T')[0],
+      priority
+    };
+    
+    const updatedGoals = [...userData.dailyGoals, newGoal];
+    saveUserData({ dailyGoals: updatedGoals });
+  };
+
+  const toggleGoalCompletion = (goalId: string) => {
+    const updatedGoals = userData.dailyGoals.map(goal =>
+      goal.id === goalId ? { ...goal, completed: !goal.completed } : goal
+    );
+    saveUserData({ dailyGoals: updatedGoals });
+  };
+
+  const updateWeeklySchedule = (day: string, data: { planned: number; subjects: string[] }) => {
+    const updatedSchedule = {
+      ...userData.weeklySchedule,
+      [day.toLowerCase()]: {
+        ...userData.weeklySchedule[day.toLowerCase()],
+        planned: data.planned,
+        subjects: data.subjects
+      }
+    };
+    saveUserData({ weeklySchedule: updatedSchedule });
+  };
+
+  const updateDayProgress = (day: string, completed: number) => {
+    const updatedSchedule = {
+      ...userData.weeklySchedule,
+      [day.toLowerCase()]: {
+        ...userData.weeklySchedule[day.toLowerCase()],
+        completed
+      }
+    };
+    saveUserData({ weeklySchedule: updatedSchedule });
   };
 
   const clearUserData = () => {
@@ -88,6 +166,10 @@ export const useUserData = () => {
   return {
     userData,
     saveUserData,
+    addDailyGoal,
+    toggleGoalCompletion,
+    updateWeeklySchedule,
+    updateDayProgress,
     clearUserData,
     metrics: calculateMetrics()
   };

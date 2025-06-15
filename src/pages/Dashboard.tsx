@@ -14,6 +14,22 @@ const Dashboard = () => {
     ? Math.floor((Date.now() - new Date(userData.lastUpdated).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
+  // Fix focus vs distraction data
+  const focusData = [
+    { 
+      name: 'Study Hours', 
+      value: userData.studyData.dailyStudyHours || 0,
+      fill: userData.studyData.dailyStudyHours > (userData.studyData.screenTime || 0) ? '#10B981' : '#EF4444'
+    },
+    { 
+      name: 'Screen Time', 
+      value: userData.studyData.screenTime || 0,
+      fill: '#6B7280'
+    }
+  ];
+
+  const showFocusAlert = userData.studyData.screenTime > userData.studyData.dailyStudyHours && userData.studyData.screenTime > 0;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
@@ -55,6 +71,25 @@ const Dashboard = () => {
                   Get Started - Add Your First Data
                 </Button>
               </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Focus vs Distraction Alert */}
+        {showFocusAlert && (
+          <Card className="mb-8 border-red-200 bg-red-50 dark:bg-red-900/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+                <div>
+                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">
+                    Focus Alert! 📱
+                  </h3>
+                  <p className="text-red-700 dark:text-red-300">
+                    Your screen time ({userData.studyData.screenTime}h) is higher than study time ({userData.studyData.dailyStudyHours}h). Time to refocus!
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
