@@ -1,4 +1,3 @@
-
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,15 +11,28 @@ import { useState, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/useUserData";
 
 const WeeklyPlanner = () => {
-  const { userData, addDailyGoal, toggleGoalCompletion, updateWeeklySchedule, updateDayProgress } = useUserData();
+  const { 
+    userData, 
+    addDailyGoal, 
+    toggleGoalCompletion, 
+    updateWeeklySchedule, 
+    updateDayProgress,
+    startStudySession,
+    completeStudySession,
+    getWeeklyActualHours,
+    getStudyCompletionRate
+  } = useUserData();
+  
   const [newGoal, setNewGoal] = useState("");
   const [goalPriority, setGoalPriority] = useState<'low' | 'medium' | 'high'>('medium');
   
   // Pomodoro timer state
-  const [timeLeft, setTimeLeft] = useState(0); // Start from 0
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [customTime, setCustomTime] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [studySubject, setStudySubject] = useState<string>("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Weekly schedule editing state
@@ -39,15 +51,15 @@ const WeeklyPlanner = () => {
   const today = new Date().toISOString().split('T')[0];
   const todaysGoals = userData.dailyGoals.filter(goal => goal.date === today);
 
-  // Calculate weekly progress
+  // Calculate weekly progress using actual hours
   const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const totalPlanned = weekDays.reduce((sum, day) => sum + userData.weeklySchedule[day].planned, 0);
-  const totalCompleted = weekDays.reduce((sum, day) => sum + userData.weeklySchedule[day].completed, 0);
-  const completionPercentage = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
+  const actualHours = getWeeklyActualHours();
+  const completionPercentage = totalPlanned > 0 ? Math.round((actualHours / totalPlanned) * 100) : 0;
+  const studyCompletionRate = getStudyCompletionRate();
 
   // Initialize audio
   useEffect(() => {
-    // Create a function to play beep sound multiple times
     const playBeepSequence = () => {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       
@@ -95,6 +107,11 @@ const WeeklyPlanner = () => {
                 console.log('Could not play sound:', error);
               }
             }
+            // Complete the study session
+            if (currentSessionId) {
+              completeStudySession(currentSessionId);
+              setCurrentSessionId(null);
+            }
             return 0;
           }
           return time - 1;
@@ -103,7 +120,7 @@ const WeeklyPlanner = () => {
     }
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, soundEnabled]);
+  }, [isRunning, timeLeft, soundEnabled, currentSessionId, completeStudySession]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -141,6 +158,7 @@ const WeeklyPlanner = () => {
   const setPresetTime = (seconds: number) => {
     setTimeLeft(seconds);
     setIsRunning(false);
+    setCurrentSessionId(null);
   };
 
   const setCustomTimerTime = () => {
@@ -149,7 +167,23 @@ const WeeklyPlanner = () => {
       setTimeLeft(minutes * 60);
       setCustomTime("");
       setIsRunning(false);
+      setCurrentSessionId(null);
     }
+  };
+
+  const handleStartTimer = () => {
+    if (!isRunning && timeLeft > 0) {
+      // Start a new study session
+      const sessionId = startStudySession(Math.floor(timeLeft / 60), studySubject || undefined);
+      setCurrentSessionId(sessionId);
+    }
+    setIsRunning(!isRunning);
+  };
+
+  const handleResetTimer = () => {
+    setIsRunning(false);
+    setTimeLeft(0);
+    setCurrentSessionId(null);
   };
 
   return (
@@ -167,19 +201,19 @@ const WeeklyPlanner = () => {
           </p>
         </div>
 
-        {/* Weekly Progress Overview */}
+        {/* Weekly Progress Overview - Updated with actual data */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
-              This Week's Progress
+              This Week's Progress (Real Data)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium">Weekly Study Goal</span>
-                <span className="text-sm text-gray-600">{totalCompleted} / {totalPlanned} hours</span>
+                <span className="text-sm font-medium">Actual vs Planned Study Hours</span>
+                <span className="text-sm text-gray-600">{actualHours.toFixed(1)} / {totalPlanned} hours</span>
               </div>
               <Progress value={completionPercentage} className="h-3" />
               <p className="text-sm text-gray-600 mt-2">
@@ -192,8 +226,8 @@ const WeeklyPlanner = () => {
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{totalCompleted}</div>
-                <div className="text-sm text-gray-600">Hours Completed</div>
+                <div className="text-2xl font-bold text-blue-600">{actualHours.toFixed(1)}</div>
+                <div className="text-sm text-gray-600">Actual Hours This Week</div>
               </div>
               <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
@@ -202,21 +236,19 @@ const WeeklyPlanner = () => {
                 <div className="text-sm text-gray-600">Goals Achieved Today</div>
               </div>
               <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                <div className="text-2xl font-bold text-indigo-600">
-                  {weekDays.filter(d => userData.weeklySchedule[d].completed > 0).length}
-                </div>
-                <div className="text-sm text-gray-600">Active Days</div>
+                <div className="text-2xl font-bold text-indigo-600">{studyCompletionRate}%</div>
+                <div className="text-sm text-gray-600">Session Completion Rate</div>
               </div>
               <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">{completionPercentage}%</div>
-                <div className="text-sm text-gray-600">Completion Rate</div>
+                <div className="text-2xl font-bold text-purple-600">{userData.studySessions.filter(s => s.completed).length}</div>
+                <div className="text-sm text-gray-600">Total Sessions Completed</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Daily Goals Section */}
+          {/* Daily Goals Section - keep existing */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -275,12 +307,12 @@ const WeeklyPlanner = () => {
             </CardContent>
           </Card>
 
-          {/* Weekly Schedule */}
+          {/* Weekly Schedule - Updated to show actual vs planned */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />
-                Weekly Schedule
+                Weekly Schedule (Planned vs Actual)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -320,12 +352,12 @@ const WeeklyPlanner = () => {
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-sm text-gray-600">
-                            {userData.weeklySchedule[day].completed} / {userData.weeklySchedule[day].planned} hours
+                            Planned: {userData.weeklySchedule[day].planned}h | Actual: {userData.weeklySchedule[day].completed}h
                           </span>
                           <Input
                             type="number"
                             className="w-20 h-6"
-                            placeholder="Done"
+                            placeholder="Actual"
                             value={userData.weeklySchedule[day].completed}
                             onChange={(e) => updateDayProgress(day, Number(e.target.value))}
                           />
@@ -353,18 +385,34 @@ const WeeklyPlanner = () => {
           </Card>
         </div>
 
-        {/* Study Timer */}
+        {/* Enhanced Study Timer with Subject Tracking */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Study Timer
+              Study Timer (Session Tracker)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
               <div className="text-6xl font-bold mb-4 text-indigo-600">
                 {formatTime(timeLeft)}
+              </div>
+              
+              {/* Subject Selection */}
+              <div className="mb-4">
+                <Select value={studySubject} onValueChange={setStudySubject}>
+                  <SelectTrigger className="w-48 mx-auto">
+                    <SelectValue placeholder="Select subject (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userData.subjects.map((subject) => (
+                      <SelectItem key={subject.name} value={subject.name}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               {/* Preset Time Buttons */}
@@ -405,7 +453,7 @@ const WeeklyPlanner = () => {
               {/* Timer Controls */}
               <div className="flex justify-center gap-4 mb-4">
                 <Button 
-                  onClick={() => setIsRunning(!isRunning)}
+                  onClick={handleStartTimer}
                   disabled={timeLeft === 0}
                   className="bg-indigo-600 hover:bg-indigo-700"
                 >
@@ -414,10 +462,7 @@ const WeeklyPlanner = () => {
                 </Button>
                 <Button 
                   variant="outline"
-                  onClick={() => {
-                    setIsRunning(false);
-                    setTimeLeft(0);
-                  }}
+                  onClick={handleResetTimer}
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Reset
@@ -436,10 +481,16 @@ const WeeklyPlanner = () => {
                 {timeLeft === 0 
                   ? "Set a time and start your focused study session!"
                   : isRunning 
-                    ? "Stay focused! You're doing great!"
+                    ? `Stay focused! ${studySubject ? `Studying ${studySubject}` : 'You\'re doing great!'}`
                     : "Timer is paused. Click start when you're ready!"
                 }
               </p>
+              
+              {currentSessionId && (
+                <p className="text-xs text-green-600 mt-2">
+                  ✅ Session is being tracked - completion will be recorded automatically
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -2,33 +2,31 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { Plus, BookOpen, Clock, TrendingUp, Users, AlertCircle } from "lucide-react";
+import { Plus, BookOpen, Clock, TrendingUp, Users, AlertCircle, Timer } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { useUserData } from "@/hooks/useUserData";
 
 const Dashboard = () => {
-  const { userData, metrics } = useUserData();
+  const { userData, metrics, getWeeklyActualHours, getStudyCompletionRate } = useUserData();
   
   const hasData = userData.subjects.length > 0;
   const timeSinceLastUpdate = userData.lastUpdated 
     ? Math.floor((Date.now() - new Date(userData.lastUpdated).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
-  // Fix focus vs distraction data
-  const focusData = [
-    { 
-      name: 'Study Hours', 
-      value: userData.studyData.dailyStudyHours || 0,
-      fill: userData.studyData.dailyStudyHours > (userData.studyData.screenTime || 0) ? '#10B981' : '#EF4444'
-    },
-    { 
-      name: 'Screen Time', 
-      value: userData.studyData.screenTime || 0,
-      fill: '#6B7280'
-    }
-  ];
+  const weeklyActualHours = getWeeklyActualHours();
+  const studyCompletionRate = getStudyCompletionRate();
+  const totalCompletedSessions = userData.studySessions.filter(session => session.completed).length;
 
-  const showFocusAlert = userData.studyData.screenTime > userData.studyData.dailyStudyHours && userData.studyData.screenTime > 0;
+  // Calculate today's study time
+  const today = new Date().toISOString().split('T')[0];
+  const todaysSessions = userData.studySessions.filter(session => 
+    session.date === today && session.completed
+  );
+  const todaysStudyMinutes = todaysSessions.reduce((sum, session) => sum + session.duration, 0);
+  const todaysStudyHours = todaysStudyMinutes / 60;
+
+  const showFocusAlert = userData.studyData.screenTime > todaysStudyHours && userData.studyData.screenTime > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -75,7 +73,7 @@ const Dashboard = () => {
           </Card>
         )}
 
-        {/* Focus vs Distraction Alert */}
+        {/* Focus vs Distraction Alert - Updated with real data */}
         {showFocusAlert && (
           <Card className="mb-8 border-red-200 bg-red-50 dark:bg-red-900/20">
             <CardContent className="p-6">
@@ -86,7 +84,7 @@ const Dashboard = () => {
                     Focus Alert! 📱
                   </h3>
                   <p className="text-red-700 dark:text-red-300">
-                    Your screen time ({userData.studyData.screenTime}h) is higher than study time ({userData.studyData.dailyStudyHours}h). Time to refocus!
+                    Your screen time ({userData.studyData.screenTime}h) is higher than today's actual study time ({todaysStudyHours.toFixed(1)}h). Time to refocus!
                   </p>
                 </div>
               </div>
@@ -94,7 +92,7 @@ const Dashboard = () => {
           </Card>
         )}
 
-        {/* Overview Cards */}
+        {/* Overview Cards - Updated with real study data */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
             <CardHeader className="pb-3">
@@ -134,16 +132,16 @@ const Dashboard = () => {
 
           <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium opacity-90">Study Hours</CardTitle>
+              <CardTitle className="text-sm font-medium opacity-90">Weekly Study Hours</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
                 <Clock className="h-8 w-8 mr-3" />
                 <div>
                   <div className="text-3xl font-bold">
-                    {userData.studyData.dailyStudyHours || '--'}
+                    {weeklyActualHours.toFixed(1)}
                   </div>
-                  <div className="text-sm opacity-90">hours/day</div>
+                  <div className="text-sm opacity-90">actual hours</div>
                 </div>
               </div>
             </CardContent>
@@ -151,57 +149,89 @@ const Dashboard = () => {
 
           <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium opacity-90">Performance</CardTitle>
+              <CardTitle className="text-sm font-medium opacity-90">Session Rate</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 mr-3" />
+                <Timer className="h-8 w-8 mr-3" />
                 <div>
                   <div className="text-3xl font-bold">
-                    {hasData ? (metrics.averageScore >= 75 ? '📈' : metrics.averageScore >= 60 ? '📊' : '📉') : '❓'}
+                    {studyCompletionRate}%
                   </div>
-                  <div className="text-sm opacity-90">
-                    {hasData ? (metrics.averageScore >= 75 ? 'excellent' : metrics.averageScore >= 60 ? 'good' : 'needs focus') : 'no data'}
-                  </div>
+                  <div className="text-sm opacity-90">completion rate</div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Performance */}
+        {/* Real Study Performance */}
         <div className="grid lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Performance</CardTitle>
+              <CardTitle>Recent Study Sessions</CardTitle>
             </CardHeader>
             <CardContent>
-              {hasData ? (
+              {totalCompletedSessions > 0 ? (
                 <div className="space-y-4">
-                  {userData.subjects.slice(0, 3).map((subject, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  {userData.studySessions
+                    .filter(session => session.completed)
+                    .slice(-5)
+                    .reverse()
+                    .map((session, index) => (
+                    <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <div>
-                        <div className="font-medium text-gray-900 dark:text-white">{subject.name}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {session.subject || 'General Study'}
+                        </div>
                         <div className="text-sm text-gray-600 dark:text-gray-300">
-                          Score: {subject.score}% | Attendance: {subject.attendance}%
+                          {session.duration} min • {new Date(session.date).toLocaleDateString()}
                         </div>
                       </div>
-                      <div className={`text-2xl ${subject.score >= 75 ? 'text-green-500' : subject.score >= 60 ? 'text-yellow-500' : 'text-red-500'}`}>
-                        {subject.score >= 75 ? '📈' : subject.score >= 60 ? '📊' : '📉'}
+                      <div className="text-2xl text-green-500">
+                        ✅
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No performance data yet</p>
-                  <p className="text-sm">Add your subject scores to see performance trends</p>
+                  <Timer className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No study sessions yet</p>
+                  <p className="text-sm">Use the timer in Weekly Planner to track sessions</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Study Statistics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <span className="font-medium">Total Completed Sessions</span>
+                  <span className="text-xl font-bold text-blue-600">{totalCompletedSessions}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <span className="font-medium">This Week's Hours</span>
+                  <span className="text-xl font-bold text-green-600">{weeklyActualHours.toFixed(1)}h</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <span className="font-medium">Today's Study Time</span>
+                  <span className="text-xl font-bold text-purple-600">{todaysStudyHours.toFixed(1)}h</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <span className="font-medium">Completion Rate</span>
+                  <span className="text-xl font-bold text-orange-600">{studyCompletionRate}%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>

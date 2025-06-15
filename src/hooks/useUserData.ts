@@ -40,6 +40,24 @@ export interface PerformanceHistory {
   overallGPA: number;
 }
 
+export interface StudySession {
+  id: string;
+  date: string;
+  duration: number; // in minutes
+  completed: boolean;
+  subject?: string;
+  startTime: string;
+  endTime?: string;
+}
+
+export interface DailyStudyStats {
+  date: string;
+  totalMinutes: number;
+  completedSessions: number;
+  totalSessions: number;
+  subjects: { [subject: string]: number };
+}
+
 export interface UserData {
   name: string;
   branch: string;
@@ -50,6 +68,8 @@ export interface UserData {
   weeklySchedule: WeeklySchedule;
   baselineData?: BaselineData;
   performanceHistory: PerformanceHistory[];
+  studySessions: StudySession[];
+  dailyStats: DailyStudyStats[];
   lastUpdated: string;
 }
 
@@ -74,6 +94,8 @@ const defaultUserData: UserData = {
     sunday: { planned: 0, completed: 0, subjects: [] }
   },
   performanceHistory: [],
+  studySessions: [],
+  dailyStats: [],
   lastUpdated: new Date().toISOString()
 };
 
@@ -91,7 +113,9 @@ export const useUserData = () => {
           ...parsedData,
           dailyGoals: parsedData.dailyGoals || [],
           weeklySchedule: parsedData.weeklySchedule || defaultUserData.weeklySchedule,
-          performanceHistory: parsedData.performanceHistory || []
+          performanceHistory: parsedData.performanceHistory || [],
+          studySessions: parsedData.studySessions || [],
+          dailyStats: parsedData.dailyStats || []
         };
         setUserData(mergedData);
       } catch (error) {
@@ -108,6 +132,93 @@ export const useUserData = () => {
     };
     setUserData(updatedData);
     localStorage.setItem('trackMyStudyData', JSON.stringify(updatedData));
+  };
+
+  const startStudySession = (duration: number, subject?: string) => {
+    const session: StudySession = {
+      id: Date.now().toString(),
+      date: new Date().toISOString().split('T')[0],
+      duration,
+      completed: false,
+      subject,
+      startTime: new Date().toISOString()
+    };
+    
+    const updatedSessions = [...userData.studySessions, session];
+    saveUserData({ studySessions: updatedSessions });
+    return session.id;
+  };
+
+  const completeStudySession = (sessionId: string) => {
+    const updatedSessions = userData.studySessions.map(session => 
+      session.id === sessionId 
+        ? { ...session, completed: true, endTime: new Date().toISOString() }
+        : session
+    );
+    
+    saveUserData({ studySessions: updatedSessions });
+    updateDailyStats();
+  };
+
+  const updateDailyStats = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todaySessions = userData.studySessions.filter(session => session.date === today);
+    
+    const totalMinutes = todaySessions
+      .filter(session => session.completed)
+      .reduce((sum, session) => sum + session.duration, 0);
+    
+    const completedSessions = todaySessions.filter(session => session.completed).length;
+    const totalSessions = todaySessions.length;
+    
+    const subjects: { [subject: string]: number } = {};
+    todaySessions
+      .filter(session => session.completed && session.subject)
+      .forEach(session => {
+        const subject = session.subject!;
+        subjects[subject] = (subjects[subject] || 0) + session.duration;
+      });
+
+    const newStats: DailyStudyStats = {
+      date: today,
+      totalMinutes,
+      completedSessions,
+      totalSessions,
+      subjects
+    };
+
+    const updatedStats = userData.dailyStats.filter(stat => stat.date !== today);
+    updatedStats.push(newStats);
+    
+    // Keep only last 30 days
+    const last30Days = updatedStats.slice(-30);
+    saveUserData({ dailyStats: last30Days });
+  };
+
+  const getWeeklyActualHours = () => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    return userData.studySessions
+      .filter(session => 
+        session.completed && 
+        new Date(session.date) >= weekAgo
+      )
+      .reduce((sum, session) => sum + session.duration, 0) / 60; // Convert to hours
+  };
+
+  const getStudyCompletionRate = () => {
+    const last7Days = userData.studySessions.filter(session => {
+      const sessionDate = new Date(session.date);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return sessionDate >= weekAgo;
+    });
+
+    if (last7Days.length === 0) return 0;
+    
+    const completed = last7Days.filter(session => session.completed).length;
+    return Math.round((completed / last7Days.length) * 100);
   };
 
   const setBaselineData = (subjects: SubjectData[]) => {
@@ -222,6 +333,11 @@ export const useUserData = () => {
     clearUserData,
     setBaselineData,
     updatePerformanceHistory,
+    startStudySession,
+    completeStudySession,
+    updateDailyStats,
+    getWeeklyActualHours,
+    getStudyCompletionRate,
     metrics: calculateMetrics()
   };
 };
