@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, Award, MapPin, Target } from "lucide-react";
+import { Users, TrendingUp, Target } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { useUserData } from "@/hooks/useUserData";
 import { useEffect } from "react";
@@ -51,14 +51,6 @@ const PeerComparison = () => {
         { month: "May", yourGPA: 0, peerAverage: 7.5, baselineGPA: 0 }
       ];
 
-  const leaderboard = [
-    { rank: 1, name: "StudyNinja", score: 94.2, location: "Bangalore" },
-    { rank: 2, name: "CodeMaster", score: 92.8, location: "Hyderabad" },
-    { rank: 3, name: "You", score: userData.subjects.length > 0 ? userData.subjects.reduce((sum, s) => sum + s.score, 0) / userData.subjects.length : 0, location: "Bangalore", isYou: true },
-    { rank: 4, name: "TechGeek", score: 84.3, location: "Chennai" },
-    { rank: 5, name: "SmartLearner", score: 83.9, location: "Bangalore" }
-  ];
-
   const handleUpdateProgress = () => {
     if (userData.subjects.length > 0) {
       updatePerformanceHistory(userData.subjects);
@@ -82,10 +74,10 @@ const PeerComparison = () => {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Users className="h-8 w-8 text-indigo-600" />
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Peer Comparison</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Personal Progress Tracking</h1>
           </div>
           <p className="text-gray-600 dark:text-gray-300">
-            See how you stack up against peers and track your progress over time
+            Track your academic progress and improvement over time
           </p>
         </div>
 
@@ -112,7 +104,7 @@ const PeerComparison = () => {
         {/* Filters */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Filter Comparisons</CardTitle>
+            <CardTitle>Filter View</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
@@ -145,16 +137,16 @@ const PeerComparison = () => {
                 </Select>
               </div>
               <div className="flex-1 min-w-48">
-                <label className="block text-sm font-medium mb-2">Location</label>
-                <Select defaultValue="bangalore">
+                <label className="block text-sm font-medium mb-2">Time Period</label>
+                <Select defaultValue="all-time">
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bangalore">Bangalore</SelectItem>
-                    <SelectItem value="hyderabad">Hyderabad</SelectItem>
-                    <SelectItem value="chennai">Chennai</SelectItem>
-                    <SelectItem value="mumbai">Mumbai</SelectItem>
+                    <SelectItem value="last-month">Last Month</SelectItem>
+                    <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                    <SelectItem value="last-6-months">Last 6 Months</SelectItem>
+                    <SelectItem value="all-time">All Time</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -176,20 +168,18 @@ const PeerComparison = () => {
                 <Tooltip />
                 <Bar dataKey="baselineScore" fill="#94A3B8" name="Your Baseline" />
                 <Bar dataKey="yourScore" fill="#6366F1" name="Current Score" />
-                <Bar dataKey="peerAverage" fill="#F59E0B" name="Peer Average" />
-                <Bar dataKey="topPercentile" fill="#10B981" name="Top 10%" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid lg:grid-cols-2 gap-8">
           {/* GPA Trend with Baseline */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                GPA Trend vs Baseline
+                Your GPA Progress Over Time
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -201,25 +191,26 @@ const PeerComparison = () => {
                   <Tooltip />
                   <Line type="monotone" dataKey="baselineGPA" stroke="#94A3B8" name="Your Baseline" strokeWidth={2} strokeDasharray="5 5" />
                   <Line type="monotone" dataKey="yourGPA" stroke="#6366F1" name="Current GPA" strokeWidth={3} />
-                  <Line type="monotone" dataKey="peerAverage" stroke="#F59E0B" name="Peer Average" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Quick Stats with Improvement */}
+          {/* Personal Progress Stats */}
           <Card>
             <CardHeader>
-              <CardTitle>Your Position & Progress</CardTitle>
+              <CardTitle>Your Progress Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <span className="text-sm font-medium">Overall Ranking</span>
-                <Badge className="bg-green-600 text-white">Top 15%</Badge>
-              </div>
               <div className="flex justify-between items-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <span className="text-sm font-medium">Above Peer Average</span>
-                <Badge variant="secondary">{userData.subjects.length > 0 ? `${userData.subjects.filter(s => s.score > 75).length} out of ${userData.subjects.length} subjects` : '0 out of 0 subjects'}</Badge>
+                <span className="text-sm font-medium">Subjects Tracked</span>
+                <Badge variant="secondary">{userData.subjects.length} subjects</Badge>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <span className="text-sm font-medium">Subjects Above 75%</span>
+                <Badge className="bg-green-600 text-white">
+                  {userData.subjects.length > 0 ? `${userData.subjects.filter(s => s.score > 75).length} out of ${userData.subjects.length}` : '0 out of 0'}
+                </Badge>
               </div>
               <div className="flex justify-between items-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
                 <span className="text-sm font-medium">Improvement from Baseline</span>
@@ -227,57 +218,13 @@ const PeerComparison = () => {
                   {calculateImprovement() >= 0 ? '+' : ''}{calculateImprovement()}%
                 </Badge>
               </div>
+              <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <span className="text-sm font-medium">Performance History</span>
+                <Badge variant="secondary">{userData.performanceHistory.length} records</Badge>
+              </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Anonymous Leaderboard */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5" />
-              Anonymous Leaderboard - {userData.branch}, Bangalore
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {leaderboard.map((student) => (
-                <div 
-                  key={student.rank} 
-                  className={`flex items-center gap-4 p-4 rounded-lg border ${
-                    student.isYou 
-                      ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700' 
-                      : 'bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    student.rank === 1 ? 'bg-yellow-500 text-white' :
-                    student.rank === 2 ? 'bg-gray-400 text-white' :
-                    student.rank === 3 ? 'bg-orange-500 text-white' :
-                    'bg-gray-200 text-gray-700'
-                  }`}>
-                    {student.rank}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-medium ${student.isYou ? 'text-indigo-600' : ''}`}>
-                        {student.name}
-                      </span>
-                      {student.isYou && <Badge variant="secondary">You</Badge>}
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      <MapPin className="h-3 w-3" />
-                      {student.location}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg">{student.score.toFixed(1)}%</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
