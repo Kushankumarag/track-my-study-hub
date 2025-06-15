@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -9,6 +8,8 @@ import { GoalAnalytics } from "@/components/GoalAnalytics";
 import { StudyStreakTracker } from "@/components/StudyStreakTracker";
 import { StressMonitor } from "@/components/StressMonitor";
 import { useUserData } from "@/hooks/useUserData";
+import { BurnoutAlert } from "@/components/BurnoutAlert";
+import { AchievementBadges } from "@/components/AchievementBadges";
 
 const Dashboard = () => {
   const { userData, metrics, getWeeklyActualHours, getStudyCompletionRate, checkStreakMaintenance } = useUserData();
@@ -57,6 +58,9 @@ const Dashboard = () => {
             </Button>
           </Link>
         </div>
+
+        <BurnoutAlert />
+        <AchievementBadges />
 
         {/* No Data State */}
         {!hasData && (

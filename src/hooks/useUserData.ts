@@ -563,6 +563,15 @@ export const useUserData = () => {
     return Math.round((total / userData.stressRecords.length) * 10) / 10;
   };
 
+  // Add new helper for weekly sleep
+  const getWeeklySleepHours = () => {
+    // Try to get from dailyStats if present, else fallback to static
+    // For now, just multiply the current sleepHours by 7 (from studyData)
+    return userData.studyData.sleepHours
+      ? Math.round(userData.studyData.sleepHours * 7)
+      : 0;
+  };
+
   // Calculate derived metrics
   const calculateMetrics = () => {
     if (userData.subjects.length === 0) {
@@ -610,6 +619,7 @@ export const useUserData = () => {
     getTodayStressLevel,
     getStressTrend,
     getAverageStressLevel,
+    getWeeklySleepHours,
     metrics: calculateMetrics()
   };
 };
