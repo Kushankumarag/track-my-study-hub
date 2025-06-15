@@ -1,14 +1,13 @@
-
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Brain, TrendingUp, AlertTriangle, CheckCircle, Target, Clock } from "lucide-react";
+import { Brain, TrendingUp, AlertTriangle, CheckCircle, Target, Clock, Users } from "lucide-react";
 import { useUserData } from "@/hooks/useUserData";
 import { Link } from "react-router-dom";
 
 const Insights = () => {
-  const { userData, metrics } = useUserData();
+  const { userData, metrics, getWeeklyActualHours, getStudyCompletionRate, getGoalCompletionTrend } = useUserData();
   const hasData = userData.subjects.length > 0;
 
   // Generate dynamic insights based on user data
@@ -21,6 +20,9 @@ const Insights = () => {
     const studyHours = userData.studyData.dailyStudyHours;
     const sleepHours = userData.studyData.sleepHours;
     const screenTime = userData.studyData.screenTime;
+    const weeklyActualHours = getWeeklyActualHours();
+    const studyCompletionRate = getStudyCompletionRate();
+    const goalTrend = getGoalCompletionTrend();
 
     // Performance insights
     if (avgScore >= 85) {
@@ -49,22 +51,114 @@ const Insights = () => {
       });
     }
 
-    // Find lowest performing subject
-    const lowestSubject = userData.subjects.reduce((lowest, current) => 
-      current.score < lowest.score ? current : lowest
-    );
-    
-    if (lowestSubject.score < avgScore - 10) {
+    // Study session insights
+    if (studyCompletionRate >= 80) {
+      insights.push({
+        type: "success",
+        icon: CheckCircle,
+        title: "Excellent Study Consistency",
+        description: `Your ${studyCompletionRate}% session completion rate shows great discipline. This consistency is key to your success.`,
+        action: "Maintain this routine"
+      });
+    } else if (studyCompletionRate < 60) {
       insights.push({
         type: "warning",
-        icon: AlertTriangle,
-        title: `${lowestSubject.name} Needs Extra Attention`,
-        description: `Your ${lowestSubject.name} score (${lowestSubject.score}%) is significantly below your average. Focus on this subject.`,
-        action: "Schedule extra study time"
+        icon: Clock,
+        title: "Improve Study Session Completion",
+        description: `Your ${studyCompletionRate}% completion rate suggests difficulty finishing planned sessions. Try shorter, focused sessions.`,
+        action: "Use Pomodoro technique"
       });
     }
 
-    // Attendance insights
+    // Weekly study hours vs planned
+    const totalPlanned = Object.values(userData.weeklySchedule).reduce((sum, day) => sum + day.planned, 0);
+    if (totalPlanned > 0) {
+      const weeklyProgress = Math.round((weeklyActualHours / totalPlanned) * 100);
+      if (weeklyProgress >= 90) {
+        insights.push({
+          type: "success",
+          icon: Target,
+          title: "Meeting Weekly Study Goals",
+          description: `You've completed ${weeklyProgress}% of your planned study hours this week. Excellent planning and execution!`,
+          action: "Continue this pattern"
+        });
+      } else if (weeklyProgress < 70) {
+        insights.push({
+          type: "warning",
+          icon: AlertTriangle,
+          title: "Behind on Weekly Study Plan",
+          description: `You've only completed ${weeklyProgress}% of planned study hours. Consider adjusting your schedule or goals.`,
+          action: "Revise weekly plan"
+        });
+      }
+    }
+
+    // Goal completion trend
+    if (goalTrend.length >= 3) {
+      const recentRates = goalTrend.slice(-3).map(day => day.rate);
+      const averageRate = recentRates.reduce((sum, rate) => sum + rate, 0) / recentRates.length;
+      
+      if (averageRate >= 80) {
+        insights.push({
+          type: "success",
+          icon: Target,
+          title: "Strong Goal Achievement",
+          description: `Your ${Math.round(averageRate)}% goal completion rate over the last 3 days shows excellent self-discipline.`,
+          action: "Set more challenging goals"
+        });
+      } else if (averageRate < 50) {
+        insights.push({
+          type: "warning",
+          icon: AlertTriangle,
+          title: "Goal Achievement Needs Improvement",
+          description: `Your ${Math.round(averageRate)}% goal completion rate suggests you may be setting too many or unrealistic goals.`,
+          action: "Set fewer, achievable goals"
+        });
+      }
+    }
+
+    // Find lowest performing subject
+    if (userData.subjects.length > 1) {
+      const lowestSubject = userData.subjects.reduce((lowest, current) => 
+        current.score < lowest.score ? current : lowest
+      );
+      
+      if (lowestSubject.score < avgScore - 10) {
+        insights.push({
+          type: "warning",
+          icon: AlertTriangle,
+          title: `${lowestSubject.name} Needs Extra Attention`,
+          description: `Your ${lowestSubject.name} score (${lowestSubject.score}%) is significantly below your average. Focus on this subject.`,
+          action: "Schedule extra study time"
+        });
+      }
+    }
+
+    // Attendance insights with real tracking
+    if (userData.attendanceRecords.length > 0) {
+      const recentAttendance = userData.attendanceRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return recordDate >= weekAgo;
+      });
+
+      if (recentAttendance.length > 0) {
+        const presentCount = recentAttendance.filter(record => record.present).length;
+        const recentAttendanceRate = Math.round((presentCount / recentAttendance.length) * 100);
+
+        if (recentAttendanceRate < 75) {
+          insights.push({
+            type: "warning",
+            icon: Users,
+            title: "Recent Attendance Alert",
+            description: `Your attendance this week (${recentAttendanceRate}%) is below the required 75%. This may affect your internal marks.`,
+            action: "Prioritize attendance"
+          });
+        }
+      }
+    }
+
     if (avgAttendance < 75) {
       insights.push({
         type: "warning",
@@ -122,12 +216,17 @@ const Insights = () => {
     }
 
     // Screen time insights
-    if (screenTime && studyHours && screenTime > studyHours) {
+    const todayStudyMinutes = userData.studySessions
+      .filter(session => session.date === new Date().toISOString().split('T')[0] && session.completed)
+      .reduce((sum, session) => sum + session.duration, 0);
+    const todayStudyHours = todayStudyMinutes / 60;
+
+    if (screenTime && todayStudyHours > 0 && screenTime > todayStudyHours) {
       insights.push({
         type: "warning",
         icon: AlertTriangle,
         title: "Screen Time Exceeding Study Time",
-        description: `${screenTime} hours of screen time vs ${studyHours} hours of study. This imbalance may hurt your focus.`,
+        description: `${screenTime} hours of screen time vs ${todayStudyHours.toFixed(1)} hours of actual study today. This imbalance may hurt your focus.`,
         action: "Reduce screen distractions"
       });
     }
@@ -139,7 +238,7 @@ const Insights = () => {
 
   const studyTips = [
     "Break study sessions into 25-minute focused blocks (Pomodoro Technique)",
-    "Review notes within 24 hours of learning for better retention",
+    "Review notes within 24 hours of learning for better retention", 
     "Practice active recall instead of passive reading",
     "Use spaced repetition for long-term memory retention",
     "Study in a distraction-free environment for maximum focus"
@@ -165,7 +264,7 @@ const Insights = () => {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Smart Insights</h1>
           </div>
           <p className="text-gray-600 dark:text-gray-300">
-            AI-powered recommendations based on your performance patterns
+            AI-powered recommendations based on your actual performance patterns
           </p>
         </div>
 

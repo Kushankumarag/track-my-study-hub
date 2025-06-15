@@ -58,6 +58,26 @@ export interface DailyStudyStats {
   subjects: { [subject: string]: number };
 }
 
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  subject: string;
+  present: boolean;
+  notes?: string;
+}
+
+export interface GoalAnalytics {
+  date: string;
+  totalGoals: number;
+  completedGoals: number;
+  completionRate: number;
+  priorityBreakdown: {
+    high: { total: number; completed: number };
+    medium: { total: number; completed: number };
+    low: { total: number; completed: number };
+  };
+}
+
 export interface UserData {
   name: string;
   branch: string;
@@ -70,6 +90,8 @@ export interface UserData {
   performanceHistory: PerformanceHistory[];
   studySessions: StudySession[];
   dailyStats: DailyStudyStats[];
+  attendanceRecords: AttendanceRecord[];
+  goalAnalytics: GoalAnalytics[];
   lastUpdated: string;
 }
 
@@ -96,6 +118,8 @@ const defaultUserData: UserData = {
   performanceHistory: [],
   studySessions: [],
   dailyStats: [],
+  attendanceRecords: [],
+  goalAnalytics: [],
   lastUpdated: new Date().toISOString()
 };
 
@@ -115,7 +139,9 @@ export const useUserData = () => {
           weeklySchedule: parsedData.weeklySchedule || defaultUserData.weeklySchedule,
           performanceHistory: parsedData.performanceHistory || [],
           studySessions: parsedData.studySessions || [],
-          dailyStats: parsedData.dailyStats || []
+          dailyStats: parsedData.dailyStats || [],
+          attendanceRecords: parsedData.attendanceRecords || [],
+          goalAnalytics: parsedData.goalAnalytics || []
         };
         setUserData(mergedData);
       } catch (error) {
@@ -221,6 +247,109 @@ export const useUserData = () => {
     return Math.round((completed / last7Days.length) * 100);
   };
 
+  // Attendance tracking functions
+  const markAttendance = (subject: string, present: boolean, notes?: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    const existingRecord = userData.attendanceRecords.find(
+      record => record.date === today && record.subject === subject
+    );
+
+    let updatedRecords;
+    if (existingRecord) {
+      updatedRecords = userData.attendanceRecords.map(record =>
+        record.id === existingRecord.id
+          ? { ...record, present, notes }
+          : record
+      );
+    } else {
+      const newRecord: AttendanceRecord = {
+        id: `${Date.now()}-${subject}`,
+        date: today,
+        subject,
+        present,
+        notes
+      };
+      updatedRecords = [...userData.attendanceRecords, newRecord];
+    }
+
+    saveUserData({ attendanceRecords: updatedRecords });
+    updateSubjectAttendance(subject);
+  };
+
+  const updateSubjectAttendance = (subjectName: string) => {
+    const last30Days = new Date();
+    last30Days.setDate(last30Days.getDate() - 30);
+    
+    const recentRecords = userData.attendanceRecords.filter(
+      record => record.subject === subjectName && new Date(record.date) >= last30Days
+    );
+
+    if (recentRecords.length === 0) return;
+
+    const presentCount = recentRecords.filter(record => record.present).length;
+    const attendancePercentage = Math.round((presentCount / recentRecords.length) * 100);
+
+    const updatedSubjects = userData.subjects.map(subject =>
+      subject.name === subjectName
+        ? { ...subject, attendance: attendancePercentage }
+        : subject
+    );
+
+    saveUserData({ subjects: updatedSubjects });
+  };
+
+  const getTodayAttendance = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return userData.attendanceRecords.filter(record => record.date === today);
+  };
+
+  // Goal analytics functions
+  const updateGoalAnalytics = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todaysGoals = userData.dailyGoals.filter(goal => goal.date === today);
+
+    if (todaysGoals.length === 0) return;
+
+    const completedGoals = todaysGoals.filter(goal => goal.completed).length;
+    const completionRate = Math.round((completedGoals / todaysGoals.length) * 100);
+
+    const priorityBreakdown = {
+      high: { total: 0, completed: 0 },
+      medium: { total: 0, completed: 0 },
+      low: { total: 0, completed: 0 }
+    };
+
+    todaysGoals.forEach(goal => {
+      priorityBreakdown[goal.priority].total++;
+      if (goal.completed) {
+        priorityBreakdown[goal.priority].completed++;
+      }
+    });
+
+    const newAnalytics: GoalAnalytics = {
+      date: today,
+      totalGoals: todaysGoals.length,
+      completedGoals,
+      completionRate,
+      priorityBreakdown
+    };
+
+    const updatedAnalytics = userData.goalAnalytics.filter(analytics => analytics.date !== today);
+    updatedAnalytics.push(newAnalytics);
+    
+    // Keep only last 30 days
+    const last30Days = updatedAnalytics.slice(-30);
+    saveUserData({ goalAnalytics: last30Days });
+  };
+
+  const getGoalCompletionTrend = () => {
+    const last7Days = userData.goalAnalytics.slice(-7);
+    return last7Days.map(analytics => ({
+      date: analytics.date,
+      rate: analytics.completionRate
+    }));
+  };
+
   const setBaselineData = (subjects: SubjectData[]) => {
     if (!userData.baselineData && subjects.length > 0) {
       const totalScore = subjects.reduce((sum, subject) => sum + subject.score, 0);
@@ -273,6 +402,7 @@ export const useUserData = () => {
       goal.id === goalId ? { ...goal, completed: !goal.completed } : goal
     );
     saveUserData({ dailyGoals: updatedGoals });
+    updateGoalAnalytics();
   };
 
   const updateWeeklySchedule = (day: string, data: { planned: number; subjects: string[] }) => {
@@ -338,6 +468,10 @@ export const useUserData = () => {
     updateDailyStats,
     getWeeklyActualHours,
     getStudyCompletionRate,
+    markAttendance,
+    getTodayAttendance,
+    updateGoalAnalytics,
+    getGoalCompletionTrend,
     metrics: calculateMetrics()
   };
 };

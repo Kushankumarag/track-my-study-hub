@@ -1,9 +1,10 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Plus, BookOpen, Clock, TrendingUp, Users, AlertCircle, Timer } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
+import { AttendanceTracker } from "@/components/AttendanceTracker";
+import { GoalAnalytics } from "@/components/GoalAnalytics";
 import { useUserData } from "@/hooks/useUserData";
 
 const Dashboard = () => {
@@ -163,6 +164,12 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* New Real-Time Tracking Section */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <AttendanceTracker />
+          <GoalAnalytics />
         </div>
 
         {/* Real Study Performance */}
