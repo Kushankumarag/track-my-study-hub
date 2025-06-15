@@ -7,8 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Target, Clock, CheckCircle, Plus, Play, Pause, RotateCcw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Calendar, Target, Clock, CheckCircle, Plus, Play, Pause, RotateCcw, Volume2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/useUserData";
 
 const WeeklyPlanner = () => {
@@ -17,13 +17,23 @@ const WeeklyPlanner = () => {
   const [goalPriority, setGoalPriority] = useState<'low' | 'medium' | 'high'>('medium');
   
   // Pomodoro timer state
-  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(0); // Start from 0
   const [isRunning, setIsRunning] = useState(false);
-  const [isBreak, setIsBreak] = useState(false);
+  const [customTime, setCustomTime] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Weekly schedule editing state
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [dayPlan, setDayPlan] = useState({ planned: 0, subjects: "" });
+
+  // Preset time options (in seconds)
+  const presetTimes = [
+    { label: "3 min", value: 3 * 60 },
+    { label: "5 min", value: 5 * 60 },
+    { label: "10 min", value: 10 * 60 },
+    { label: "25 min", value: 25 * 60 },
+  ];
 
   // Get today's goals
   const today = new Date().toISOString().split('T')[0];
@@ -35,28 +45,55 @@ const WeeklyPlanner = () => {
   const totalCompleted = weekDays.reduce((sum, day) => sum + userData.weeklySchedule[day].completed, 0);
   const completionPercentage = totalPlanned > 0 ? Math.round((totalCompleted / totalPlanned) * 100) : 0;
 
+  // Initialize audio
+  useEffect(() => {
+    // Create a simple beep sound using Web Audio API
+    const createBeepSound = () => {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 1);
+    };
+
+    audioRef.current = { play: createBeepSound } as any;
+  }, []);
+
   // Pomodoro timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (isRunning && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft(time => time - 1);
+        setTimeLeft(time => {
+          if (time <= 1) {
+            setIsRunning(false);
+            if (soundEnabled && audioRef.current) {
+              try {
+                audioRef.current.play();
+              } catch (error) {
+                console.log('Could not play sound:', error);
+              }
+            }
+            return 0;
+          }
+          return time - 1;
+        });
       }, 1000);
-    } else if (timeLeft === 0) {
-      setIsRunning(false);
-      // Auto switch between work and break
-      if (isBreak) {
-        setTimeLeft(25 * 60); // Back to 25 min work session
-        setIsBreak(false);
-      } else {
-        setTimeLeft(5 * 60); // 5 min break
-        setIsBreak(true);
-      }
     }
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, isBreak]);
+  }, [isRunning, timeLeft, soundEnabled]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -89,6 +126,20 @@ const WeeklyPlanner = () => {
       planned: dayData.planned,
       subjects: dayData.subjects.join(', ')
     });
+  };
+
+  const setPresetTime = (seconds: number) => {
+    setTimeLeft(seconds);
+    setIsRunning(false);
+  };
+
+  const setCustomTimerTime = () => {
+    const minutes = parseInt(customTime);
+    if (!isNaN(minutes) && minutes > 0) {
+      setTimeLeft(minutes * 60);
+      setCustomTime("");
+      setIsRunning(false);
+    }
   };
 
   return (
@@ -292,26 +343,61 @@ const WeeklyPlanner = () => {
           </Card>
         </div>
 
-        {/* Pomodoro Timer */}
+        {/* Study Timer */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Pomodoro Timer
+              Study Timer
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <div className={`text-6xl font-bold mb-4 ${isBreak ? 'text-green-600' : 'text-indigo-600'}`}>
+              <div className="text-6xl font-bold mb-4 text-indigo-600">
                 {formatTime(timeLeft)}
               </div>
-              <div className="text-sm text-gray-600 mb-4">
-                {isBreak ? '☕ Break Time!' : '📚 Focus Time!'}
+              
+              {/* Preset Time Buttons */}
+              <div className="flex justify-center gap-2 mb-4 flex-wrap">
+                {presetTimes.map((preset) => (
+                  <Button 
+                    key={preset.value}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPresetTime(preset.value)}
+                    className="text-xs"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
               </div>
+
+              {/* Custom Time Input */}
+              <div className="flex justify-center gap-2 mb-4">
+                <Input
+                  type="number"
+                  placeholder="Minutes"
+                  value={customTime}
+                  onChange={(e) => setCustomTime(e.target.value)}
+                  className="w-24 text-center"
+                  min="1"
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={setCustomTimerTime}
+                  disabled={!customTime}
+                >
+                  Set
+                </Button>
+              </div>
+
+              {/* Timer Controls */}
               <div className="flex justify-center gap-4 mb-4">
                 <Button 
                   onClick={() => setIsRunning(!isRunning)}
-                  className={isBreak ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'}
+                  disabled={timeLeft === 0}
+                  className="bg-indigo-600 hover:bg-indigo-700"
                 >
                   {isRunning ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
                   {isRunning ? 'Pause' : 'Start'}
@@ -320,17 +406,28 @@ const WeeklyPlanner = () => {
                   variant="outline"
                   onClick={() => {
                     setIsRunning(false);
-                    setTimeLeft(isBreak ? 5 * 60 : 25 * 60);
+                    setTimeLeft(0);
                   }}
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Reset
                 </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className={soundEnabled ? 'bg-green-50' : ''}
+                >
+                  <Volume2 className={`h-4 w-4 mr-2 ${soundEnabled ? 'text-green-600' : 'text-gray-400'}`} />
+                  Sound {soundEnabled ? 'On' : 'Off'}
+                </Button>
               </div>
+
               <p className="text-sm text-gray-600">
-                {isBreak 
-                  ? "Take a well-deserved break! Stretch, hydrate, or just relax."
-                  : "Ready for a focused study session? Choose your subject and let's get started!"
+                {timeLeft === 0 
+                  ? "Set a time and start your focused study session!"
+                  : isRunning 
+                    ? "Stay focused! You're doing great!"
+                    : "Timer is paused. Click start when you're ready!"
                 }
               </p>
             </div>
