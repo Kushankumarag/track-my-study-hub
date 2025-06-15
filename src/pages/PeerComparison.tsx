@@ -1,4 +1,3 @@
-
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -115,10 +114,9 @@ const PeerComparison = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="computer-science">Computer Science</SelectItem>
-                    <SelectItem value="electronics">Electronics</SelectItem>
-                    <SelectItem value="mechanical">Mechanical</SelectItem>
-                    <SelectItem value="civil">Civil Engineering</SelectItem>
+                    <SelectItem value={userData.branch.toLowerCase().replace(' ', '-')}>
+                      {userData.branch}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
