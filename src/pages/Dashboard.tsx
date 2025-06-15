@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -5,10 +6,15 @@ import { Plus, BookOpen, Clock, TrendingUp, Users, AlertCircle, Timer } from "lu
 import { Navigation } from "@/components/Navigation";
 import { AttendanceTracker } from "@/components/AttendanceTracker";
 import { GoalAnalytics } from "@/components/GoalAnalytics";
+import { StudyStreakTracker } from "@/components/StudyStreakTracker";
+import { StressMonitor } from "@/components/StressMonitor";
 import { useUserData } from "@/hooks/useUserData";
 
 const Dashboard = () => {
-  const { userData, metrics, getWeeklyActualHours, getStudyCompletionRate } = useUserData();
+  const { userData, metrics, getWeeklyActualHours, getStudyCompletionRate, checkStreakMaintenance } = useUserData();
+  
+  // Check if streak needs to be maintained
+  checkStreakMaintenance();
   
   const hasData = userData.subjects.length > 0;
   const timeSinceLastUpdate = userData.lastUpdated 
@@ -170,6 +176,12 @@ const Dashboard = () => {
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <AttendanceTracker />
           <GoalAnalytics />
+        </div>
+
+        {/* New Features Section - Study Streak and Stress Monitor */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <StudyStreakTracker />
+          <StressMonitor />
         </div>
 
         {/* Real Study Performance */}

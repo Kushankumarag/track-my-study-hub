@@ -78,6 +78,21 @@ export interface GoalAnalytics {
   };
 }
 
+export interface StudyStreak {
+  currentStreak: number;
+  longestStreak: number;
+  lastStudyDate: string;
+  streakHistory: { date: string; maintained: boolean }[];
+}
+
+export interface StressRecord {
+  id: string;
+  date: string;
+  level: number; // 1-10 scale
+  notes?: string;
+  factors?: string[]; // exam, assignment, personal, etc.
+}
+
 export interface UserData {
   name: string;
   branch: string;
@@ -92,6 +107,8 @@ export interface UserData {
   dailyStats: DailyStudyStats[];
   attendanceRecords: AttendanceRecord[];
   goalAnalytics: GoalAnalytics[];
+  studyStreak: StudyStreak;
+  stressRecords: StressRecord[];
   lastUpdated: string;
 }
 
@@ -120,6 +137,13 @@ const defaultUserData: UserData = {
   dailyStats: [],
   attendanceRecords: [],
   goalAnalytics: [],
+  studyStreak: {
+    currentStreak: 0,
+    longestStreak: 0,
+    lastStudyDate: '',
+    streakHistory: []
+  },
+  stressRecords: [],
   lastUpdated: new Date().toISOString()
 };
 
@@ -141,7 +165,9 @@ export const useUserData = () => {
           studySessions: parsedData.studySessions || [],
           dailyStats: parsedData.dailyStats || [],
           attendanceRecords: parsedData.attendanceRecords || [],
-          goalAnalytics: parsedData.goalAnalytics || []
+          goalAnalytics: parsedData.goalAnalytics || [],
+          studyStreak: parsedData.studyStreak || defaultUserData.studyStreak,
+          stressRecords: parsedData.stressRecords || []
         };
         setUserData(mergedData);
       } catch (error) {
@@ -184,6 +210,7 @@ export const useUserData = () => {
     
     saveUserData({ studySessions: updatedSessions });
     updateDailyStats();
+    updateStudyStreak(); // Update streak when completing a session
   };
 
   const updateDailyStats = () => {
@@ -247,7 +274,6 @@ export const useUserData = () => {
     return Math.round((completed / last7Days.length) * 100);
   };
 
-  // Attendance tracking functions
   const markAttendance = (subject: string, present: boolean, notes?: string) => {
     const today = new Date().toISOString().split('T')[0];
     const existingRecord = userData.attendanceRecords.find(
@@ -303,7 +329,6 @@ export const useUserData = () => {
     return userData.attendanceRecords.filter(record => record.date === today);
   };
 
-  // Goal analytics functions
   const updateGoalAnalytics = () => {
     const today = new Date().toISOString().split('T')[0];
     const todaysGoals = userData.dailyGoals.filter(goal => goal.date === today);
@@ -433,6 +458,111 @@ export const useUserData = () => {
     setUserData(defaultUserData);
   };
 
+  // Study Streak Functions
+  const updateStudyStreak = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayStats = userData.dailyStats.find(stat => stat.date === today);
+    
+    if (!todayStats || todayStats.totalMinutes < 30) return; // Minimum 30 minutes to count
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    let newStreak = userData.studyStreak;
+
+    if (userData.studyStreak.lastStudyDate === yesterdayStr) {
+      // Continue streak
+      newStreak = {
+        ...userData.studyStreak,
+        currentStreak: userData.studyStreak.currentStreak + 1,
+        lastStudyDate: today,
+        longestStreak: Math.max(userData.studyStreak.longestStreak, userData.studyStreak.currentStreak + 1)
+      };
+    } else if (userData.studyStreak.lastStudyDate !== today) {
+      // Start new streak or reset
+      newStreak = {
+        ...userData.studyStreak,
+        currentStreak: 1,
+        lastStudyDate: today,
+        longestStreak: Math.max(userData.studyStreak.longestStreak, 1)
+      };
+    }
+
+    // Add to streak history
+    const streakHistory = [...userData.studyStreak.streakHistory, { date: today, maintained: true }];
+    newStreak.streakHistory = streakHistory.slice(-30); // Keep last 30 days
+
+    saveUserData({ studyStreak: newStreak });
+  };
+
+  const checkStreakMaintenance = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // If we missed yesterday and had a streak, reset it
+    if (userData.studyStreak.lastStudyDate === yesterdayStr && userData.studyStreak.currentStreak > 0) {
+      const todayStats = userData.dailyStats.find(stat => stat.date === today);
+      if (!todayStats || todayStats.totalMinutes < 30) {
+        // Streak broken
+        saveUserData({
+          studyStreak: {
+            ...userData.studyStreak,
+            currentStreak: 0
+          }
+        });
+      }
+    }
+  };
+
+  // Stress Monitoring Functions
+  const recordStressLevel = (level: number, notes?: string, factors?: string[]) => {
+    const today = new Date().toISOString().split('T')[0];
+    const existingRecord = userData.stressRecords.find(record => record.date === today);
+
+    let updatedRecords;
+    if (existingRecord) {
+      updatedRecords = userData.stressRecords.map(record =>
+        record.id === existingRecord.id
+          ? { ...record, level, notes, factors }
+          : record
+      );
+    } else {
+      const newRecord: StressRecord = {
+        id: `stress-${Date.now()}`,
+        date: today,
+        level,
+        notes,
+        factors
+      };
+      updatedRecords = [...userData.stressRecords, newRecord];
+    }
+
+    // Keep only last 30 days
+    const last30Days = updatedRecords.slice(-30);
+    saveUserData({ stressRecords: last30Days });
+  };
+
+  const getTodayStressLevel = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return userData.stressRecords.find(record => record.date === today);
+  };
+
+  const getStressTrend = () => {
+    return userData.stressRecords.slice(-7).map(record => ({
+      date: record.date,
+      level: record.level
+    }));
+  };
+
+  const getAverageStressLevel = () => {
+    if (userData.stressRecords.length === 0) return 0;
+    const total = userData.stressRecords.reduce((sum, record) => sum + record.level, 0);
+    return Math.round((total / userData.stressRecords.length) * 10) / 10;
+  };
+
   // Calculate derived metrics
   const calculateMetrics = () => {
     if (userData.subjects.length === 0) {
@@ -472,6 +602,14 @@ export const useUserData = () => {
     getTodayAttendance,
     updateGoalAnalytics,
     getGoalCompletionTrend,
+    // New streak functions
+    updateStudyStreak,
+    checkStreakMaintenance,
+    // New stress monitoring functions
+    recordStressLevel,
+    getTodayStressLevel,
+    getStressTrend,
+    getAverageStressLevel,
     metrics: calculateMetrics()
   };
 };
