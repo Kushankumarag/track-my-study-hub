@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 export interface SubjectData {
@@ -29,6 +28,18 @@ export interface WeeklySchedule {
   };
 }
 
+export interface BaselineData {
+  subjects: SubjectData[];
+  overallGPA: number;
+  dateRecorded: string;
+}
+
+export interface PerformanceHistory {
+  date: string;
+  subjects: SubjectData[];
+  overallGPA: number;
+}
+
 export interface UserData {
   name: string;
   branch: string;
@@ -37,6 +48,8 @@ export interface UserData {
   studyData: StudyData;
   dailyGoals: DailyGoal[];
   weeklySchedule: WeeklySchedule;
+  baselineData?: BaselineData;
+  performanceHistory: PerformanceHistory[];
   lastUpdated: string;
 }
 
@@ -60,6 +73,7 @@ const defaultUserData: UserData = {
     saturday: { planned: 0, completed: 0, subjects: [] },
     sunday: { planned: 0, completed: 0, subjects: [] }
   },
+  performanceHistory: [],
   lastUpdated: new Date().toISOString()
 };
 
@@ -76,7 +90,8 @@ export const useUserData = () => {
           ...defaultUserData,
           ...parsedData,
           dailyGoals: parsedData.dailyGoals || [],
-          weeklySchedule: parsedData.weeklySchedule || defaultUserData.weeklySchedule
+          weeklySchedule: parsedData.weeklySchedule || defaultUserData.weeklySchedule,
+          performanceHistory: parsedData.performanceHistory || []
         };
         setUserData(mergedData);
       } catch (error) {
@@ -93,6 +108,40 @@ export const useUserData = () => {
     };
     setUserData(updatedData);
     localStorage.setItem('trackMyStudyData', JSON.stringify(updatedData));
+  };
+
+  const setBaselineData = (subjects: SubjectData[]) => {
+    if (!userData.baselineData && subjects.length > 0) {
+      const totalScore = subjects.reduce((sum, subject) => sum + subject.score, 0);
+      const overallGPA = totalScore / subjects.length;
+      
+      const baseline: BaselineData = {
+        subjects: [...subjects],
+        overallGPA,
+        dateRecorded: new Date().toISOString()
+      };
+      
+      saveUserData({ baselineData: baseline });
+    }
+  };
+
+  const updatePerformanceHistory = (subjects: SubjectData[]) => {
+    if (subjects.length === 0) return;
+    
+    const totalScore = subjects.reduce((sum, subject) => sum + subject.score, 0);
+    const overallGPA = totalScore / subjects.length;
+    
+    const newEntry: PerformanceHistory = {
+      date: new Date().toISOString(),
+      subjects: [...subjects],
+      overallGPA
+    };
+    
+    const updatedHistory = [...userData.performanceHistory, newEntry];
+    // Keep only last 10 entries to avoid too much data
+    const trimmedHistory = updatedHistory.slice(-10);
+    
+    saveUserData({ performanceHistory: trimmedHistory });
   };
 
   const addDailyGoal = (text: string, priority: 'low' | 'medium' | 'high' = 'medium') => {
@@ -171,6 +220,8 @@ export const useUserData = () => {
     updateWeeklySchedule,
     updateDayProgress,
     clearUserData,
+    setBaselineData,
+    updatePerformanceHistory,
     metrics: calculateMetrics()
   };
 };
